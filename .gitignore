@@ -1,0 +1,10 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+data/*
+!data/README.md
+
+outputs/*
+!outputs/YueHe_FinalPaper.html 

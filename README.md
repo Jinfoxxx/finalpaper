@@ -16,3 +16,10 @@ The code section has been completed
 2. Add OLS model tables incorporating control variables “age\gender\edu\soc_trust” to further validate H2.
 3. Following the professor's advice, I removed complex large-scale model interactions and replaced them with the most representative cross-national comparison of "Camera" attitudes.
 4. Conducted data visualization for H3.
+
+# 06/01
+Rename the variables:
+1. support_camera -> support_video
+2. support_email -> support_internet
+3. support_phone -> support_convert
+

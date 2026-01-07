@@ -1,0 +1,366 @@
+---
+title: "Acceptance of State Surveillance towards Political Trust"
+output: html_document
+date: "2026-01-07"
+---
+
+## **Acceptance of State Surveillance towards Political Trust**
+
+**from the European Values Study 2017 – focus on Germany**
+
+**Abstract**
+
+This short paper uses data from the 2017 European Values Study, focusing primarily on Germany, and also employing comparative sample data from Sweden, Poland, and Italy. The aim is to explore the limits of European publics' acceptance of state surveillance. Utilizing the core variable of "political trust," to explore whether trust can truly unconditionally confer legitimacy upon state surveillance as digital surveillance infrastructure expands globally. The data results of the OLS regression model reveal that the “Privacy Cliff” does indeed exist. While political trust significantly increases public support for public video surveillance, this legitimacy disappears as the degree of surveillance crosses the line, particularly when data is covertly collected without publics' knowledge. Moreover, despite variations in baseline acceptance across countries, the psychological mechanism that transforms trust into support remains statistically universal. These findings confirm that in today's digital society, a nation's legitimacy is bound by transparency rather than blind trust.
+
+**Introduction**
+
+The rapid proliferation of digital surveillance technology is shaping an entirely new social contract between the state and the public. From the widespread use of CCTV cameras monitoring public spaces to the digital tracking in internet, the development of surveillance infrastructure is increasingly becoming a global trend in modern social governance. The continuous evolution of this technology also raises a critical question: where exactly do publics in different political cultures draw the line between "social security" and "intrusive violations"?
+
+Although traditional political science literature views "political trust" as the primary regulator of this “trade–off” mechanism, the "Trust-for-Security" (Davis & Silver, 2004) interpretation appears increasingly inadequate in today's complex realities. This short paper will examine the "credit limit" of political trust. Is this trust still effective when state authority attempts to intrude into highly sensitive private spheres? For this purpose, I use data from the 2017 European Values Study to construct a multi-level model of attitudes toward surveillance. Taking Germany sample as the primary case, examines how political trust interacts with three distinct degrees of technological intrusion: public surveillance video, email & internet monitoring, and covert information collection without citizens' knowledge. At the end, the scope of analysis will be expanded to different European regions, represented by Sweden, Poland, and Italy, to examine whether this mechanism holds universal applicability across diverse national contexts.
+
+**Literature Review & Hypotheses**
+
+The academic debate on surveillance has long centered on the role of “political trust.” According to the classic " Trust-for-Security" model, publics who trust their political institutions are more willing to grant the state the power to maintain public order (Davis & Silver, 2004). However, existing literature often treat "surveillance" as a singular concept, overlooking variations in its intensity. The theory of "Contextual Integrity" (Nissenbaum, 2004) demonstrates that privacy violations depend on the specific context. What is acceptable in public areas, such as video surveillance, is unacceptable in private residences. Furthermore, Nalepa and Pop-Eleches noted in 2022 that post-communist societies carry a "legacy of distrust" due to the historical trauma of the secret police, meaning public attitudes toward surveillance are shaped by national history.
+
+Based on previous studies, I formulate the following hypotheses:
+
+H1: Political trust positively influences public surveillance support
+
+H2: The political trust effect diminishes as the degree of surveillance intrusion increases
+
+H3: The relationship between political trust and surveillance support varies across national contexts
+
+**Data & Methods**
+
+This study relies on data from the 2017 European Values Study, which provides comparable data on European attitudes. To ensure representation of diverse political cultures, I selected four European countries: Germany, Sweden, Poland, and Italy, representing the west, north, east, and south respectively.
+
+I use the Germany sample (N = 1573) to test H1 and H2, examining the impact of technological intrusiveness. And then I employ the combined full sample (N = 5169) to investigate the cross-national differences in H3. To ensure data quality, I exclud respondents with missing values, such as "don't know" or refusal to answer.
+
+All the respondents were asked whether the following government actions are justified: 1. Public Video Survaillance (Keeping people under video surveillance in public areas), 2. Internet Surveillance (Monitoring e-mails and information exchanged on the Internet) 3. Covert Surveillance (Collecting information about anyone without their knowledge). Second, I used the merged whole sample (N = 5169) to examine cross-national differences for H3. These responses were originally recorded on a 4-point scale and recoded so that higher values indicate stronger support. The key predictor variable, “political trust,” is captured by the respondent's reported confidence in the political parties. To ensure data quality, I filtered respondents with missing values, such as "don't know" or refusal responses. For isolating the specific effect of political trust, I also control for gender, age, education level, and generalized social trust.
+
+To test my first two hypotheses regarding the "Privacy Cliff," I run a set of OLS regression models on the German sample, estimating the effect of trust separately for each of the three surveillance types. For the third hypothesis, I employ an interaction model on the full pooled sample to examine whether the relationship between political trust and surveillance support varies significantly across national contexts.
+
+**Results**
+
+```{r}
+
+rm(list=ls(all=TRUE))
+library(tidyverse)
+library(stargazer)
+library(haven)
+library(interactions)
+library(ggplot2)
+library(patchwork)
+library(sjPlot)
+
+getwd()
+
+evs2017 <- read_dta("ZA7500_v5-0-0.dta")
+head(evs2017)
+set.seed(123)
+
+# select the variables
+evs_selected <- evs2017[,c("v205", "v206", "v207", "age_r3", "v225", "v243_edulvlb_1", "v31", "v130", "country")]
+head(evs_selected)
+table(evs_selected$country)
+   
+# filter countries
+evs_subset <- evs_selected %>%
+filter(country %in% c(276, 752, 616, 380)) %>%
+mutate(country = factor(country,
+                    levels = c(276, 752, 616, 380),
+                    labels = c("Germany", "Sweden", "Poland", "Italy")))
+glimpse(evs_subset)
+
+# check the NA
+colSums(is.na(evs_subset))
+
+# rename
+evs_clean <- evs_subset %>%
+  rename(support_video = v205, 
+         support_internet = v206, 
+         support_convert = v207, 
+         gender = v225,
+         education = v243_edulvlb_1,
+         soc_trust = v31,
+         pol_trust = v130) %>%
+# decoding dependent variables
+  mutate(across(c(support_video, support_internet, support_convert), 
+                ~ case_when(. %in% 1:4 ~ 5 - as.numeric(.), 
+                            . %in% -10:-1 ~ NA_real_, TRUE ~ NA_real_)),
+  
+# convert dependent variables to ordered factors
+  across(c(support_video, support_internet, support_convert),
+         ~ ordered(., levels = 1:4)),
+
+# decoding the independent variables
+# pol trust
+pol_trust = case_when(pol_trust %in% 1:4 ~ 5 - as.numeric(pol_trust), 
+                      pol_trust %in% -10:-1 ~ NA_real_, TRUE ~ NA_real_),
+# soc trust
+soc_trust = case_when(soc_trust %in% 1:2 ~ 2 - as.numeric(soc_trust), 
+                      soc_trust %in% -10:-1 ~ NA_real_, TRUE ~ NA_real_),
+
+# gender
+gender = case_when(gender %in% 1:2 ~ as.character(gender), 
+                   gender %in% -10:-1 ~ NA_character_, TRUE ~ NA_character_),
+gender = factor(gender, levels = c("1", "2"),
+                labels = c("Male", "Female" )),
+# age
+age = case_when(age_r3 == 1 ~ "18-24",
+                age_r3 == 2 ~ "25-34",
+                age_r3 == 3 ~ "35-44",
+                age_r3 == 4 ~ "45-54",
+                age_r3 == 5 ~ "55-64",
+                age_r3 == 6 ~ "65-74",
+                age_r3 == 7 ~ "75+",
+                age_r3 < 0 ~ NA_character_,
+                TRUE ~ NA_character_),
+# convert age to ordered factor
+age = factor(age, levels = c("18-24", "25-34", "35-44",
+                             "45-54", "55-64", "75+",
+                             ordered = TRUE)),
+# edu
+edu_level = case_when(education %in% c(0, 1, 2) ~ "Low", 
+                      education %in% c(3, 4) ~ "Medium",
+                      education %in% c(5, 6, 7, 8) ~ "High",
+                      education == 66 ~ NA_character_,
+                      education %in% -9:-1 ~ NA_character_,
+                      TRUE ~ NA_character_),
+# convert edu to ordered factor
+edu_level = factor(edu_level, levels = c("Low", "Medium", "High"),
+                     ordered = TRUE)) %>%
+# removing the original edu variables
+select(-education, -age_r3)
+
+names(evs_clean)
+
+# check the NA
+missing_value <- map_int(evs_clean, ~sum(is.na(.)))
+print(missing_value)
+missing_percent <- map_dbl(evs_clean, ~mean(is.na(.)) * 100)
+print(missing_percent)
+
+# check thetatal cases
+total_samples <- sum(complete.cases(evs_clean))
+print(total_samples)
+
+## [Deepseek guide] 
+## The original sample is 6993, but after handling the variables,
+## the final number of sample becomes to 5169. Almost 26% of the samples were lost.
+## The 16.75% missing vlue of age is kinda significantly, which i think it is worth to pay attention.
+## I think simply deleting them would impact the results. 
+## Therefore, I consulted Deepseek regarding the appropriate handling method.
+## He advised me to drop missing values solely in the analytical variables.
+## However, i followed the steps as he suggested, the final samples wre kept 5294 in this case.
+## The difference between this approach and removing all missing values was only 2.4%.
+## Which i think is extremely close, so i still remove all missing values in this case.
+
+# keep all the samples in dependent variables
+df_final <- evs_clean %>%
+  drop_na(support_video, pol_trust, age, gender, edu_level, soc_trust, country)
+
+# check the distribution in 4 countries
+final_distribution <- df_final %>%
+  group_by(country) %>%
+  summarise(n_final = n(), percentage_final = n()/nrow(df_final)*100)
+print(final_distribution)
+
+# drop all the missing values
+df <- evs_clean %>% 
+  drop_na()
+
+# check the sample size
+nrow(df)
+
+# check the correlation between video&internet&convert
+cor_matrix <- df %>%
+  select(support_video, support_internet, support_convert) %>%
+  mutate(across(everything(), as.numeric)) %>%
+  cor(use = "complete.obs")
+print(cor_matrix)
+
+# check the distribution in 4 countries
+df_distribution <- df %>%
+  group_by(country) %>%
+  summarise(n_complete = n(), percentage_complete = n()/nrow(df)*100)
+print(df_distribution)
+
+# camparison
+# Number of keeping all denpent variables
+nrow(df_final)
+#Number of removing all the missing values
+nrow(df)
+# Overall difference
+nrow(df_final) - nrow(df)
+    round((nrow(df_final) - nrow(df))/nrow(df_final)*100, 1)
+
+## [Deepseek Guide]
+## Here i got some problems in comparing the details of 4 countries.
+## I asked Deepseek to help combine the 2 tables together, and compare the missing values of the 4 countries separately.
+
+# compare the two tables across 4 countries
+comparison <- final_distribution %>%
+  left_join(df_distribution, by = "country") %>%
+  mutate(
+    n_diff = n_final - n_complete,
+    perc_diff = round((n_diff / n_final) * 100, 1)
+  )
+print(comparison)
+
+cat("\nDifference across 4 countries:\n")
+for(i in 1:nrow(comparison)) {
+  country_name <- comparison$country[i]
+  n_diff <- comparison$n_diff[i]
+  perc_diff <- comparison$perc_diff[i]
+  
+  cat(country_name, "difference:", n_diff, "(", perc_diff, "%)\n")
+}
+
+
+# OLS model in German for H1
+## H1:The higher the level of political trust, 
+## the greater the public's acceptance of state surveillance.
+
+# select the DE samples
+DE <- df %>%
+  filter(country == "Germany")
+nrow(DE)
+
+# OLS
+fit <- lm(as.numeric(support_video) ~ pol_trust + age + gender + edu_level + soc_trust,
+          data = DE)
+summary(fit)
+confint(fit)
+
+```
+
+**H1: Political trust positively influences public surveillance support.**
+
+This paper mainly focus on the samples of Germany, examining the impact of political trust on surveillance support by controlling the independent variables of age, gender, education level, and social trust, and comparing the differences in support levels under varying degrees of surveillance. Finally, the national interaction model (Germany, Sweden, Poland, Italy) was introduced to further examine the universality of this mechanism in a cross-national context.
+
+Table 1 presents the results of a multiple OLS regression model analyzing German respondents' support levels for three degrees of surveillance: video, internt, and covert infomation. The data supports H1. In the full model controlling for age, gender, education level, and social trust, political trust exhibits a significant positive influence on support for public video surveillance (b = 0.098\*\*, p \< 0.05). Notably, compared to the bivariate baseline (b  = 0.078，p \< 0.1)  in Table 2, the coefficient for political trust in the full model shows a significant increase. This indicates that certain demographic characteristics, such as age and gender, also exert some influence on surveillance support, potentially suppressing the true effects of political trust. Table 2 shows that middle-aged and elderly groups (45–75+) exhibit significantly higher levels of surveillance support compared to younger groups (18-44). On the other hand, women demonstrate stronger privacy defense tendencies than men (b = −0.115, p \< 0.05).
+
+```{r}
+
+# OLS models for comparing support for monitoring types (H2)
+## H2:Public acceptance of state surveillance lessens as intrusiveness increases.
+
+# OLS for 3 monitor types seperately 
+monitor_models <- list(
+  video = lm(as.numeric(support_video) ~ pol_trust, data = DE),
+  internet = lm(as.numeric(support_internet) ~ pol_trust, data = DE),
+  convert = lm(as.numeric(support_convert) ~ pol_trust, data = DE)
+)
+
+# create the regression tables
+stargazer(monitor_models,
+          type = "text",
+          style = "apsr",
+          title = "3 Types of Monitor Acceptance in Germany",
+          dep.var.labels = c("video", "internet", "convert"),
+          covariate.labels = c("Political Trust"),
+          out = "table1.html")
+
+# OLS for 3 monitor types seperately (Control 'age\gender\edu\soc_trust')
+monitor_models_full <- list(
+  video = lm(as.numeric(support_video) ~ pol_trust + age + gender + edu_level + soc_trust, data = DE),
+  internet = lm(as.numeric(support_internet) ~ pol_trust + age + gender + edu_level + soc_trust, data = DE),
+  convert = lm(as.numeric(support_convert) ~ pol_trust + age + gender + edu_level + soc_trust, data = DE)
+)
+
+summary(monitor_models_full$video)
+summary(monitor_models_full$internet)
+summary(monitor_models_full$convert)
+
+stargazer(monitor_models_full,
+          type = "text", 
+          style = "apsr",
+          title = "3 Types of Monitor Acceptance in Germany (Full)",
+          dep.var.labels = c("video", "internet", "convert"),
+          out = "table2_full.html")
+
+```
+
+**H2: The political trust effect diminishes as the degree of surveillance intrusion increases.**
+
+The dramatic shift in intercept values partially confirms H2 regarding the "degree of surveillance." As intrusiveness increases, German acceptance declines sharply from 2.412 for videos to a steep drop to 1.478 for internet, while showing a slight increase to 1.548 for covert information. Considering the 95% confidence interval, the fluctuation range for internet is [1.26, 1.70], and for covert information is [1.34, 1.76]. The significant overlap between the two intervals suggests that German support for the surveillance of "internet" and "convert information" is mathematically indistinguishable, both at an extremely low level.
+
+The regression coefficient explains the "boundary" of political trust. When considering the constant simultaneously, political trust effectively trades for public support in the low-intrusive video scenario (b = 0.098\*\*, constant = 2.412\*\*\*). Meanwhile, in the middle intrusive email & internet scenario (b = 0.112\*\*\*, constant = 1.478\*\*\*), despite lower baseline support, political trust is still effective for public compromise. While in the higher intrusive scenario of covert surveillance (b = 0.066\*, constant = 1.548\*\*\*), the coefficient's decline renders "political trust" ineffective.
+
+This finding reveals how high levels of intrusiveness undermine the effectiveness of "political trust," demonstrating that public support for covert surveillance cannot be compensated for by boosting political trust.
+
+```{r}
+# interaction model for H3 (video only)
+## H3: Public acceptance of different degrees of state surveillance differs across countries.
+df_clean <-df %>%
+  drop_na()
+
+# create a interaction model (pol_trust x countries) for H3
+video_interaction <- lm(as.numeric(support_video) ~ pol_trust * country +  age + gender + edu_level + soc_trust,
+                         data = df_clean)
+summary(video_interaction)
+stargazer(video_interaction,
+          type = "text",
+          style = "apsr",
+          title = "Public acceptance of state video across countries",
+          out = "table2_h3.html")
+
+# visualizations - H3
+h3 <- plot_model(video_interaction, 
+                 type = "pred", 
+                 terms = c("pol_trust", "country"),
+                 ci.lvl = 0.95,
+                 show.data = FALSE) +
+  labs(title = "Effect of political trust on video support across countries",
+       y = "Support for video (1-4)", 
+       x = "Political Trust (1-4, High=Trust)") +
+  theme_sjplot()
+
+h3
+
+```
+
+**H3: The relationship between political trust and surveillance support varies across national contexts.**
+
+Table 3 analyzes four representative countries across different regions of Europe: Germany, Sweden, Poland, and Italy. It focuses on observing the similarities and differences in public support for camera surveillance across these national contexts, which is the primary concern of this paper.
+
+First, I take Germany (constant = 2.5, pol_trust = 0.093\*\*) as the baseline, the differences in constant across countries are highly statistically significant. Sweden exhibits extremely high acceptance (b = 0.743\*\*\*, p \< 0.001), meaning Swedes generally support video surveillance 0.743 more than Germans; Poland (b = -0.708\*\*\*, p \< 0.001) shows the exact opposite result, indicating that Polish support for video surveillance is 0.708 lower than that of Germans. Italy (b = 0.264\*\*\*, p \< 0.001) falls between these two, with support slightly higher than Germans by 0.264.
+
+However, by examining the interaction term "political trust × country" in the model, I find that the results for all countries fail to reach statistical significance (p \> 0.1). Therefore, we have to reject H3.
+
+Although the data results contradict my H3, they still offer valuable insights. While Germans demonstrate significantly higher support for video surveillance than Poles, the regression slopes for both countries are statistically parallel. Therefore, whether in Western European nations like Germany or Eastern European countries like Poland, the mechanism remains consistent: "For every unit increase in political trust, support for video surveillance also increases." This demonstrates that while baseline levels of public support vary across national contexts, the driving force of political trust remains consistent in shaping public support.
+
+**Discussion**
+
+This short paper aims to examine the boundaries of political trust's role in legitimizing state surveillance. The results of H1 and H2 counterintuitively revise the traditional linear model that posits "the more public trust the government, the more willing they are to give their privacy rights." Although data confirms that the variable of “political trust” can indeed evoke public compromise, this mechanism is not unconditional. This paper identifies a distinct "Privacy Cliff": when surveillance is confined to public spaces, such as videos or semi-private domains, like email & internet, high levels of political trust effectively mitigate public privacy offense. Public demonstrate a willingness to cede certain privacy rights in “trade off” for investments in public safety. However, once surveillance extends into highly private spaces covertly, such as phone wiretapping, the explanation of political trust breaks down.
+
+This indicates that the legitimacy of public authority has "Boundaries." When state power attempts to breach the line of defense for personal privacy, the public develops intense resistance. At this point, regardless of how much trust individuals originally placed in the government, such mechanisim can no longer alleviate public anxiety over privacy.
+
+The analysis of H3's results yields a conclusion that is both contradictory and consistent: the differentiation of baseline and the universality of mechanisms.
+
+On one hand, the variation in constant across countries confirms that national contexts shape baseline levels of public attitudes. The polarized baseline acceptance of surveillance between Sweden and Poland cannot be explained solely by current economic development levels. The extreme resistance exhibited by the Polish sample may be closely linked to its specific historical trauma.
+
+In the Polish context, surveillance has historically been disconnected from "public safety" and closely associated with authoritarian repression. As Nalepa and Pop-Eleches (2022) confirm in their analysis of the Polish People's Republic, the extensive infiltration of the secret police created a deeply established network of distrust that persisted long after democratization. Their research indicates that for publics who lived under or inherited the memory of this regime, state surveillance is not perceived as a tool of governance but as a mechanism of political control. Thus, the negative constant in the Polish model can be interpreted as a quantitative manifestation of this 'surveillance trauma': the act of data collection itself triggers an instinctive defensive reaction rooted in historical experience.
+
+On the other hand, the insignificant interaction effects in the data reveal the cross- national stability of political trust mechanisms. Even between Sweden and Poland, which exhibit substantial differences in baseline levels, political trust remains statistically parallel. This implies that the "trade-off" between Trust and Security is not merely a product of a specific cultural context, but may well be a universal psychological phenomenon that transcends specific situations. Regardless of the political and cultural environment in which publics reside, effectively enhancing political trust in the government can then raise their tolerance threshold for public surveillance to a certain extent.
+
+**Conclusion & Reflection**
+
+This paper primarily investigates European publics' acceptance of state surveillance, using "political trust" as the core variable to explore the public's perception of the boundary between privacy and public safety.
+
+Research findings confirm the existence of the “Privacy Cliff.” While political trust can effectively increase public support for public video surveillance and, to some extent, enable the exchange of certain privacy concessions for public trust, such as in email and internet monitoring, this legitimizing force becomes ineffective once the state engages in covert data collection without public knowledge. This indicates that the "Trust-for-Security" exchange holds only within transparent domains. When the state oversteps into secrecy, trust alone cannot compensate for the violation of informed consent. Cross-national model analysis further reveals that while differences exist between nations due to historical, cultural, and political contexts, this mechanism exhibits statistical universality.
+
+However, the scope of this article's analysis is limited to European nations. Publics within Europe may inherently share certain common backgrounds, making their attitudes toward liberal democratic values and individual privacy rights potentially a shared product of this shared soil. Whether this "Privacy Cliff" exists globally remains an open question. In other continents with entirely different cultural traditions, such as collectivist societies in East Asian cultures or political systems with distinct security imperatives, the social contract between publics and the state may differ significantly. Future research could therefore extend this framework beyond the West to examine how diverse political cultures shape the boundaries of surveillance acceptance.
+
+**Reference**
+
+*Davis, D. W., & Silver, B. D. (2004).* Civil liberties vs. security: Public opinion in the context of the terrorist attacks on America. *American Journal of Political Science*, 48(1), 28-46.
+
+*Nissenbaum, H. (2004). Privacy as contextual integrity. Washington Law Review, 79(1), 119-158.*
+
+*Pop-Eleches, G., & Tucker, J. A. (2017).* *Communism's shadow: Historical legacies and contemporary political attitudes*. Princeton University Press.
+
+*EVS (2017).* *European Values Study 2017: Integrated Dataset (EVS 2017)*. GESIS Data Archive, Cologne.
+
+*Nalepa, M., & Pop-Eleches, G. (2022).* Authoritarian infiltration of organizations: Causes and consequences. *The Journal of Politics*, 84(2), 1048–1063.
